@@ -1,5 +1,6 @@
 // src/components/Projects/CreateProjectModal.jsx
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
+import { userAPI } from '../../services/api';
 
 const CreateProjectModal = ({ isOpen, onClose, onProjectCreated }) => {
   const [formData, setFormData] = useState({
@@ -11,14 +12,29 @@ const CreateProjectModal = ({ isOpen, onClose, onProjectCreated }) => {
   const [loading, setLoading] = useState(false);
   const [memberEmail, setMemberEmail] = useState('');
   const [memberList, setMemberList] = useState([]);
+  const [availableUsers, setAvailableUsers] = useState([]);
+  const [loadingUsers, setLoadingUsers] = useState(false);
 
-  // Sample users - replace with API call
-  const availableUsers = [
-    { id: 1, name: 'John Doe', email: 'john@taskflow.com' },
-    { id: 2, name: 'Jane Smith', email: 'jane@taskflow.com' },
-    { id: 3, name: 'Mike Johnson', email: 'mike@taskflow.com' },
-    { id: 4, name: 'Sarah Wilson', email: 'sarah@taskflow.com' },
-  ];
+  // Fetch real users from data service when modal opens
+  useEffect(() => {
+    if (isOpen) {
+      fetchAvailableUsers();
+    }
+  }, [isOpen]);
+
+  const fetchAvailableUsers = async () => {
+    setLoadingUsers(true);
+    try {
+      const response = await userAPI.getAll();
+      // Filter only ACTIVE users
+      const activeUsers = (response.data || []).filter(user => user.status === 'ACTIVE');
+      setAvailableUsers(activeUsers);
+    } catch (error) {
+      console.error('Error fetching users:', error);
+    } finally {
+      setLoadingUsers(false);
+    }
+  };
 
   const handleChange = (e) => {
     const { name, value } = e.target;
@@ -34,8 +50,9 @@ const CreateProjectModal = ({ isOpen, onClose, onProjectCreated }) => {
     if (user && !memberList.find(m => m.id === user.id)) {
       setMemberList([...memberList, user]);
       setMemberEmail('');
+      setErrors(prev => ({ ...prev, members: '' }));
     } else {
-      setErrors({ ...errors, members: 'User not found or already added' });
+      setErrors(prev => ({ ...prev, members: 'User not found or already added' }));
     }
   };
 
@@ -62,14 +79,22 @@ const CreateProjectModal = ({ isOpen, onClose, onProjectCreated }) => {
     setLoading(true);
     
     setTimeout(() => {
+      // Get current logged-in user (manager) to add as default member
+      const currentUserStr = localStorage.getItem('taskflow_user');
+      const currentUser = currentUserStr ? JSON.parse(currentUserStr) : null;
+      
+      // Create members list with user IDs only
+      const memberIds = memberList.map(m => m.id);
+      
+      // Add current manager if not already in list
+      if (currentUser && !memberIds.includes(currentUser.id)) {
+        memberIds.push(currentUser.id);
+      }
+      
       const newProject = {
-        id: Date.now(),
         name: formData.name,
         description: formData.description,
-        status: 'ACTIVE',
-        createdAt: new Date().toISOString(),
-        members: memberList,
-        taskCount: 0,
+        members: memberIds,
       };
       
       console.log('Project created:', newProject);
@@ -81,6 +106,7 @@ const CreateProjectModal = ({ isOpen, onClose, onProjectCreated }) => {
       
       setFormData({ name: '', description: '', members: [] });
       setMemberList([]);
+      setMemberEmail('');
     }, 500);
   };
 
@@ -153,39 +179,55 @@ const CreateProjectModal = ({ isOpen, onClose, onProjectCreated }) => {
                 <label className="block text-sm font-medium text-gray-700 mb-1">
                   Add Team Members
                 </label>
-                <div className="flex space-x-2">
-                  <input
-                    type="email"
-                    value={memberEmail}
-                    onChange={(e) => setMemberEmail(e.target.value)}
-                    placeholder="Enter email address"
-                    className="flex-1 px-3 py-2 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none"
-                  />
-                  <button
-                    type="button"
-                    onClick={addMember}
-                    className="px-4 py-2 bg-gray-100 text-gray-700 rounded-xl hover:bg-gray-200 transition-colors"
-                  >
-                    Add
-                  </button>
-                </div>
-                {errors.members && <p className="mt-1 text-xs text-red-600">{errors.members}</p>}
-                
-                {memberList.length > 0 && (
-                  <div className="mt-2 space-y-1">
-                    {memberList.map(member => (
-                      <div key={member.id} className="flex justify-between items-center p-2 bg-gray-50 rounded-lg">
-                        <span className="text-sm">{member.name} ({member.email})</span>
-                        <button
-                          type="button"
-                          onClick={() => removeMember(member.id)}
-                          className="text-red-500 hover:text-red-700 text-xs"
-                        >
-                          Remove
-                        </button>
-                      </div>
-                    ))}
+                {loadingUsers ? (
+                  <div className="flex items-center space-x-2 px-3 py-2 border border-gray-200 rounded-xl bg-gray-50">
+                    <div className="w-4 h-4 border-2 border-blue-500 border-t-transparent rounded-full animate-spin"></div>
+                    <span className="text-sm text-gray-500">Loading users...</span>
                   </div>
+                ) : (
+                  <>
+                    <div className="flex space-x-2">
+                      <input
+                        type="email"
+                        value={memberEmail}
+                        onChange={(e) => setMemberEmail(e.target.value)}
+                        placeholder="Enter email address"
+                        list="user-emails"
+                        className="flex-1 px-3 py-2 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none"
+                      />
+                      <datalist id="user-emails">
+                        {availableUsers.map(user => (
+                          <option key={user.id} value={user.email}>{user.name}</option>
+                        ))}
+                      </datalist>
+                      <button
+                        type="button"
+                        onClick={addMember}
+                        className="px-4 py-2 bg-gray-100 text-gray-700 rounded-xl hover:bg-gray-200 transition-colors"
+                      >
+                        Add
+                      </button>
+                    </div>
+                    {errors.members && <p className="mt-1 text-xs text-red-600">{errors.members}</p>}
+                    
+                    {memberList.length > 0 && (
+                      <div className="mt-2 space-y-1">
+                        <p className="text-xs text-gray-500 mb-1">Selected members:</p>
+                        {memberList.map(member => (
+                          <div key={member.id} className="flex justify-between items-center p-2 bg-gray-50 rounded-lg">
+                            <span className="text-sm">{member.name} ({member.email})</span>
+                            <button
+                              type="button"
+                              onClick={() => removeMember(member.id)}
+                              className="text-red-500 hover:text-red-700 text-xs"
+                            >
+                              Remove
+                            </button>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </>
                 )}
               </div>
 

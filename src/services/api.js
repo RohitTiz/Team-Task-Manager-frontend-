@@ -1,9 +1,10 @@
-// src/services/api.js - No axios dependency
+// src/services/api.js
 import { STORAGE_KEYS } from '../utils/constants';
+import { userService, projectService, taskService, syncAll } from './dataService';
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8080/api';
 
-// Simple fetch wrapper
+// Simple fetch wrapper (kept for future backend integration)
 const request = async (url, options = {}) => {
   const token = localStorage.getItem(STORAGE_KEYS.TOKEN) || sessionStorage.getItem(STORAGE_KEYS.TOKEN);
   
@@ -36,36 +37,26 @@ const request = async (url, options = {}) => {
   return data;
 };
 
-// Mock login for testing without backend
+// ============================================
+// AUTH API - Using localStorage persistence
+// ============================================
 export const login = async (email, password) => {
   console.log('Login attempt:', { email, password });
   
   // Simulate network delay
   await new Promise(resolve => setTimeout(resolve, 800));
   
-  // Demo credentials
-  if (email === 'manager@taskflow.com' && password === 'password123') {
+  // Validate against stored users
+  const user = userService.validateLogin(email, password);
+  
+  if (user) {
+    const token = `mock-jwt-token-${user.id}-${Date.now()}`;
     return {
-      token: 'mock-jwt-token-12345',
-      user: {
-        id: 1,
-        name: 'John Manager',
-        email: 'manager@taskflow.com',
-        role: 'MANAGER',
-      },
-    };
-  } else if (email === 'user@taskflow.com' && password === 'password123') {
-    return {
-      token: 'mock-jwt-token-67890',
-      user: {
-        id: 2,
-        name: 'Jane User',
-        email: 'user@taskflow.com',
-        role: 'USER',
-      },
+      token: token,
+      user: user,
     };
   } else {
-    throw new Error('Invalid email or password. Try: manager@taskflow.com / password123');
+    throw new Error('Invalid email or password');
   }
 };
 
@@ -85,42 +76,155 @@ export const getCurrentUser = async () => {
   throw new Error('No user found');
 };
 
-// API methods for future backend integration
-const api = {
-  get: (url) => request(url, { method: 'GET' }),
-  post: (url, data) => request(url, { method: 'POST', body: JSON.stringify(data) }),
-  put: (url, data) => request(url, { method: 'PUT', body: JSON.stringify(data) }),
-  delete: (url) => request(url, { method: 'DELETE' }),
-};
-
-// Project APIs
-export const projectAPI = {
-  getAll: () => request('/projects', { method: 'GET' }),
-  getById: (id) => request(`/projects/${id}`, { method: 'GET' }),
-  create: (data) => request('/projects', { method: 'POST', body: JSON.stringify(data) }),
-  update: (id, data) => request(`/projects/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
-  delete: (id) => request(`/projects/${id}`, { method: 'DELETE' }),
-  addMember: (projectId, userId) => request(`/projects/${projectId}/members`, { method: 'POST', body: JSON.stringify({ userId }) }),
-  removeMember: (projectId, userId) => request(`/projects/${projectId}/members/${userId}`, { method: 'DELETE' }),
-  getMembers: (projectId) => request(`/projects/${projectId}/members`, { method: 'GET' }),
-  getTasks: (projectId) => request(`/projects/${projectId}/tasks`, { method: 'GET' }),
-  addTask: (projectId, taskData) => request(`/projects/${projectId}/tasks`, { method: 'POST', body: JSON.stringify(taskData) }),
-};
-
-// Mock data for projects (for testing without backend)
-export const mockProjects = [
-  {
-    id: 1,
-    name: 'Default Project',
-    description: 'Default project containing all existing tasks',
-    status: 'ACTIVE',
-    createdAt: '2024-01-01',
-    members: [
-      { id: 1, name: 'John Manager', email: 'manager@taskflow.com', role: 'MANAGER' },
-      { id: 2, name: 'Jane User', email: 'user@taskflow.com', role: 'USER' },
-    ],
-    taskCount: 4,
+// ============================================
+// USER API - Using dataService
+// ============================================
+export const userAPI = {
+  getAll: () => {
+    return Promise.resolve({ data: userService.getAll() });
   },
-];
+  getById: (id) => {
+    return Promise.resolve({ data: userService.getById(id) });
+  },
+  create: (userData) => {
+    const newUser = userService.create(userData);
+    return Promise.resolve({ data: newUser });
+  },
+  update: (id, userData) => {
+    const updated = userService.update(id, userData);
+    return Promise.resolve({ data: updated });
+  },
+  delete: (id) => {
+    userService.delete(id);
+    return Promise.resolve({ data: { success: true } });
+  },
+  toggleStatus: (id) => {
+    userService.toggleStatus(id);
+    return Promise.resolve({ data: { success: true } });
+  },
+};
+
+// ============================================
+// PROJECT API - Using dataService
+// ============================================
+export const projectAPI = {
+  getAll: () => {
+    const projects = projectService.getAll();
+    // Populate member details and task count
+    const projectsWithDetails = projects.map(p => projectService.getById(p.id));
+    return Promise.resolve({ data: projectsWithDetails });
+  },
+  getById: (id) => {
+    const project = projectService.getById(id);
+    return Promise.resolve({ data: project });
+  },
+  create: (data) => {
+    const newProject = projectService.create(data);
+    syncAll();
+    return Promise.resolve({ data: newProject });
+  },
+  update: (id, data) => {
+    // Implementation if needed
+    return Promise.resolve({ data: { success: true } });
+  },
+  delete: (id) => {
+    // Implementation if needed
+    return Promise.resolve({ data: { success: true } });
+  },
+  addMember: (projectId, userId) => {
+    const result = projectService.addMember(projectId, userId);
+    return Promise.resolve({ data: { success: result } });
+  },
+  removeMember: (projectId, userId) => {
+    const result = projectService.removeMember(projectId, userId);
+    return Promise.resolve({ data: { success: result } });
+  },
+  getMembers: (projectId) => {
+    const project = projectService.getById(projectId);
+    return Promise.resolve({ data: project?.membersDetails || [] });
+  },
+  getTasks: (projectId) => {
+    const tasks = taskService.getByProjectId(projectId);
+    return Promise.resolve({ data: tasks });
+  },
+  addTask: (projectId, taskData) => {
+    const newTask = taskService.create({ ...taskData, projectId });
+    syncAll();
+    return Promise.resolve({ data: newTask });
+  },
+};
+
+// ============================================
+// TASK API - Using dataService
+// ============================================
+export const taskAPI = {
+  getAll: (params) => {
+    let tasks = taskService.getAll();
+    // Apply filters if provided
+    if (params?.status && params.status !== '') {
+      tasks = tasks.filter(t => t.status === params.status);
+    }
+    if (params?.priority && params.priority !== '') {
+      tasks = tasks.filter(t => t.priority === params.priority);
+    }
+    if (params?.search && params.search !== '') {
+      tasks = tasks.filter(t => t.title.toLowerCase().includes(params.search.toLowerCase()));
+    }
+    return Promise.resolve({ data: tasks });
+  },
+  getById: (id) => {
+    const task = taskService.getById(id);
+    return Promise.resolve({ data: task });
+  },
+  create: (data) => {
+    const newTask = taskService.create(data);
+    syncAll();
+    return Promise.resolve({ data: newTask });
+  },
+  update: (id, data) => {
+    const updated = taskService.update(id, data);
+    return Promise.resolve({ data: updated });
+  },
+  delete: (id) => {
+    taskService.delete(id);
+    syncAll();
+    return Promise.resolve({ data: { success: true } });
+  },
+  updateStatus: (id, status) => {
+    const updated = taskService.updateStatus(id, status);
+    syncAll();
+    return Promise.resolve({ data: updated });
+  },
+  getMyTasks: () => {
+    const userStr = localStorage.getItem(STORAGE_KEYS.USER) || sessionStorage.getItem(STORAGE_KEYS.USER);
+    const currentUser = userStr ? JSON.parse(userStr) : null;
+    if (currentUser) {
+      const tasks = taskService.getByUserId(currentUser.id);
+      return Promise.resolve({ data: tasks });
+    }
+    return Promise.resolve({ data: [] });
+  },
+  getStats: () => {
+    const stats = taskService.getStats();
+    return Promise.resolve({ data: stats });
+  },
+  addComment: (id, comment) => {
+    // Comments implementation if needed
+    return Promise.resolve({ data: { success: true } });
+  },
+  getComments: (id) => {
+    return Promise.resolve({ data: [] });
+  },
+};
+
+// Keep mockProjects for reference
+export const mockProjects = projectService.getAll();
+
+const api = {
+  get: request,
+  post: request,
+  put: request,
+  delete: request,
+};
 
 export default api;

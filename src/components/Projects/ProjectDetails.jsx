@@ -4,6 +4,7 @@ import { useParams, useNavigate } from 'react-router-dom';
 import StatusBadge from '../Common/StatusBadge';
 import PriorityBadge from '../Common/PriorityBadge';
 import AddMemberModal from './AddMemberModal';
+import { projectAPI, taskAPI, userAPI } from '../../services/api';
 
 const ProjectDetails = () => {
   const { id } = useParams();
@@ -20,93 +21,100 @@ const ProjectDetails = () => {
     priority: 'MEDIUM',
     deadline: '',
   });
+  const [allUsers, setAllUsers] = useState([]);
 
-  // Mock data - replace with API calls
+  // Load project data from data service
   useEffect(() => {
-    // Simulate API fetch
-    setTimeout(() => {
-      const mockProject = {
-        id: parseInt(id),
-        name: id === '1' ? 'Default Project' : 'E-Commerce Platform',
-        description: id === '1' 
-          ? 'Default project containing all existing tasks'
-          : 'Building a modern e-commerce platform with React and Spring Boot',
-        status: 'ACTIVE',
-        createdAt: '2024-01-01',
-        members: [
-          { id: 1, name: 'John Manager', email: 'manager@taskflow.com', role: 'MANAGER' },
-          { id: 2, name: 'Jane User', email: 'user@taskflow.com', role: 'USER' },
-          { id: 3, name: 'Mike Johnson', email: 'mike@taskflow.com', role: 'USER' },
-        ],
-      };
-
-      const mockTasks = [
-        {
-          id: 1,
-          title: 'Fix login authentication bug',
-          assignedTo: 'John Doe',
-          assignedToId: 2,
-          status: 'PENDING',
-          priority: 'HIGH',
-          deadline: '2024-05-12',
-        },
-        {
-          id: 2,
-          title: 'Implement email notification service',
-          assignedTo: 'Jane Smith',
-          assignedToId: 3,
-          status: 'IN_PROGRESS',
-          priority: 'MEDIUM',
-          deadline: '2024-05-15',
-        },
-      ];
-
-      setProject(mockProject);
-      setTasks(mockTasks);
-      setLoading(false);
-    }, 500);
+    fetchProjectData();
+    fetchAllUsers();
   }, [id]);
 
-  const handleAddMember = (member) => {
-    setProject(prev => ({
-      ...prev,
-      members: [...prev.members, member]
-    }));
-    console.log('Member added:', member);
-    console.log('Email sent to:', member.email);
+  const fetchProjectData = async () => {
+    setLoading(true);
+    try {
+      // Fetch project details
+      const projectRes = await projectAPI.getById(parseInt(id));
+      setProject(projectRes.data);
+      
+      // Fetch project tasks
+      const tasksRes = await projectAPI.getTasks(parseInt(id));
+      setTasks(tasksRes.data || []);
+    } catch (error) {
+      console.error('Error fetching project data:', error);
+    } finally {
+      setLoading(false);
+    }
   };
 
-  const handleRemoveMember = (memberId) => {
-    setProject(prev => ({
-      ...prev,
-      members: prev.members.filter(m => m.id !== memberId)
-    }));
+  const fetchAllUsers = async () => {
+    try {
+      const usersRes = await userAPI.getAll();
+      setAllUsers(usersRes.data || []);
+    } catch (error) {
+      console.error('Error fetching users:', error);
+    }
   };
 
-  const handleCreateTask = (e) => {
+  const handleAddMember = async (member) => {
+    try {
+      await projectAPI.addMember(parseInt(id), member.id);
+      // Refresh project data
+      await fetchProjectData();
+      console.log('Member added:', member);
+      console.log('Email sent to:', member.email);
+    } catch (error) {
+      console.error('Error adding member:', error);
+    }
+  };
+
+  const handleRemoveMember = async (memberId) => {
+    if (window.confirm('Remove this member from the project?')) {
+      try {
+        await projectAPI.removeMember(parseInt(id), memberId);
+        await fetchProjectData();
+      } catch (error) {
+        console.error('Error removing member:', error);
+      }
+    }
+  };
+
+  const handleCreateTask = async (e) => {
     e.preventDefault();
-    const selectedUser = project.members.find(m => m.id === parseInt(newTask.assignedTo));
-    const task = {
-      id: Date.now(),
+    
+    const taskData = {
       title: newTask.title,
       description: newTask.description,
-      assignedTo: selectedUser?.name || 'Unassigned',
-      assignedToId: newTask.assignedTo,
-      status: 'PENDING',
+      assignedTo: parseInt(newTask.assignedTo),
       priority: newTask.priority,
       deadline: newTask.deadline,
     };
-    setTasks([task, ...tasks]);
-    setIsCreateTaskModalOpen(false);
-    setNewTask({ title: '', description: '', assignedTo: '', priority: 'MEDIUM', deadline: '' });
-    console.log('Task created for project:', project.name);
-    console.log('Email sent to:', selectedUser?.email);
+    
+    try {
+      const response = await projectAPI.addTask(parseInt(id), taskData);
+      setTasks(prevTasks => [response.data, ...prevTasks]);
+      setIsCreateTaskModalOpen(false);
+      setNewTask({ title: '', description: '', assignedTo: '', priority: 'MEDIUM', deadline: '' });
+      console.log('Task created for project:', project.name);
+    } catch (error) {
+      console.error('Error creating task:', error);
+    }
   };
 
-  const handleTaskStatusUpdate = (taskId, newStatus) => {
-    setTasks(tasks.map(task => 
-      task.id === taskId ? { ...task, status: newStatus } : task
-    ));
+  const handleTaskStatusUpdate = async (taskId, newStatus) => {
+    try {
+      await taskAPI.updateStatus(taskId, newStatus);
+      setTasks(tasks.map(task => 
+        task.id === taskId ? { ...task, status: newStatus } : task
+      ));
+    } catch (error) {
+      console.error('Error updating task status:', error);
+    }
+  };
+
+  // Helper to get user name by ID
+  const getUserName = (userId) => {
+    const user = allUsers.find(u => u.id === userId);
+    return user?.name || 'Unknown';
   };
 
   if (loading) {
@@ -134,6 +142,9 @@ const ProjectDetails = () => {
     pending: tasks.filter(t => t.status === 'PENDING').length,
     inProgress: tasks.filter(t => t.status === 'IN_PROGRESS').length,
   };
+
+  // Get project members with full details
+  const projectMembers = project.membersDetails || [];
 
   return (
     <div className="space-y-6">
@@ -206,23 +217,27 @@ const ProjectDetails = () => {
           </button>
         </div>
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
-          {project.members.map(member => (
-            <div key={member.id} className="flex justify-between items-center p-3 bg-gray-50 rounded-lg">
-              <div>
-                <p className="font-medium text-gray-900">{member.name}</p>
-                <p className="text-xs text-gray-500">{member.email}</p>
-                <span className="text-xs text-blue-600">{member.role}</span>
+          {projectMembers.length === 0 ? (
+            <p className="text-gray-500 text-sm">No members yet</p>
+          ) : (
+            projectMembers.map(member => (
+              <div key={member.id} className="flex justify-between items-center p-3 bg-gray-50 rounded-lg">
+                <div>
+                  <p className="font-medium text-gray-900">{member.name}</p>
+                  <p className="text-xs text-gray-500">{member.email}</p>
+                  <span className="text-xs text-blue-600">{member.role}</span>
+                </div>
+                {member.role !== 'MANAGER' && (
+                  <button
+                    onClick={() => handleRemoveMember(member.id)}
+                    className="text-red-500 hover:text-red-700 text-xs"
+                  >
+                    Remove
+                  </button>
+                )}
               </div>
-              {member.role !== 'MANAGER' && (
-                <button
-                  onClick={() => handleRemoveMember(member.id)}
-                  className="text-red-500 hover:text-red-700 text-xs"
-                >
-                  Remove
-                </button>
-              )}
-            </div>
-          ))}
+            ))
+          )}
         </div>
       </div>
 
@@ -260,7 +275,7 @@ const ProjectDetails = () => {
                 {tasks.map(task => (
                   <tr key={task.id} className="hover:bg-gray-50">
                     <td className="px-6 py-4 text-sm text-gray-900">{task.title}</td>
-                    <td className="px-6 py-4 text-sm text-gray-600">{task.assignedTo}</td>
+                    <td className="px-6 py-4 text-sm text-gray-600">{task.assignedToName || getUserName(task.assignedTo)}</td>
                     <td className="px-6 py-4">
                       <select
                         value={task.status}
@@ -296,7 +311,7 @@ const ProjectDetails = () => {
         isOpen={isAddMemberModalOpen}
         onClose={() => setIsAddMemberModalOpen(false)}
         onAddMember={handleAddMember}
-        currentMembers={project.members}
+        currentMembers={projectMembers}
       />
 
       {/* Create Task Modal - Simplified for Project */}
@@ -329,7 +344,7 @@ const ProjectDetails = () => {
                 required
               >
                 <option value="">Assign to...</option>
-                {project.members.map(member => (
+                {projectMembers.map(member => (
                   <option key={member.id} value={member.id}>{member.name}</option>
                 ))}
               </select>

@@ -1,10 +1,12 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import StatsCard from './StatsCard';
 import StatusBadge from '../Common/StatusBadge';
 import PriorityBadge from '../Common/PriorityBadge';
 import CreateTaskModal from '../Tasks/CreateTaskModal';
 import CreateProjectModal from '../Projects/CreateProjectModal';
 import ProjectCard from '../Projects/ProjectCard';
+import { taskAPI, projectAPI } from '../../services/api';
+import { TASK_STATUS } from '../../utils/constants';
 
 const ManagerDashboard = () => {
   const [filters, setFilters] = useState({
@@ -16,91 +18,81 @@ const ManagerDashboard = () => {
   const [isTaskModalOpen, setIsTaskModalOpen] = useState(false);
   const [isProjectModalOpen, setIsProjectModalOpen] = useState(false);
   
-  // Projects State
-  const [projects, setProjects] = useState([
-    {
-      id: 1,
-      name: 'Default Project',
-      description: 'Default project containing all existing tasks',
-      status: 'ACTIVE',
-      createdAt: '2024-01-01',
-      members: [
-        { id: 1, name: 'John Manager', email: 'manager@taskflow.com', role: 'MANAGER' },
-        { id: 2, name: 'Jane User', email: 'user@taskflow.com', role: 'USER' },
-      ],
-      taskCount: 4,
-    },
-  ]);
-  
-  // Tasks State
-  const [tasks, setTasks] = useState([
-    {
-      id: 1,
-      title: 'Fix login authentication bug',
-      assignedTo: 'John Doe',
-      status: 'PENDING',
-      priority: 'HIGH',
-      deadline: '2024-05-12',
-      projectId: 1,
-    },
-    {
-      id: 2,
-      title: 'Implement email notification service',
-      assignedTo: 'Jane Smith',
-      status: 'IN_PROGRESS',
-      priority: 'MEDIUM',
-      deadline: '2024-05-15',
-      projectId: 1,
-    },
-    {
-      id: 3,
-      title: 'Update user documentation',
-      assignedTo: 'Mike Johnson',
-      status: 'COMPLETED',
-      priority: 'LOW',
-      deadline: '2024-05-10',
-      projectId: 1,
-    },
-    {
-      id: 4,
-      title: 'Deploy to production environment',
-      assignedTo: 'Sarah Wilson',
-      status: 'PENDING',
-      priority: 'HIGH',
-      deadline: '2024-05-08',
-      projectId: 1,
-    },
-  ]);
+  // State for data from API
+  const [projects, setProjects] = useState([]);
+  const [tasks, setTasks] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [stats, setStats] = useState({
+    total: 0,
+    completed: 0,
+    inProgress: 0,
+    pending: 0,
+  });
 
-  // Stats without overdue
-  const stats = {
-    total: tasks.length,
-    completed: tasks.filter(t => t.status === 'COMPLETED').length,
-    pending: tasks.filter(t => t.status === 'PENDING').length,
+  // Load data from data service on component mount
+  useEffect(() => {
+    fetchDashboardData();
+  }, []);
+
+  const fetchDashboardData = async () => {
+    setLoading(true);
+    try {
+      const [projectsRes, tasksRes, statsRes] = await Promise.all([
+        projectAPI.getAll(),
+        taskAPI.getAll(),
+        taskAPI.getStats(),
+      ]);
+      
+      setProjects(projectsRes.data || []);
+      setTasks(tasksRes.data || []);
+      setStats(statsRes.data || { total: 0, completed: 0, inProgress: 0, pending: 0 });
+    } catch (error) {
+      console.error('Error fetching dashboard data:', error);
+    } finally {
+      setLoading(false);
+    }
   };
 
-  const handleProjectCreated = (newProject) => {
-    setProjects(prevProjects => [newProject, ...prevProjects]);
-    console.log('Project created:', newProject);
+  const handleProjectCreated = async (newProject) => {
+    try {
+      const response = await projectAPI.create(newProject);
+      setProjects(prevProjects => [response.data, ...prevProjects]);
+      console.log('Project created:', response.data);
+    } catch (error) {
+      console.error('Error creating project:', error);
+    }
   };
 
-  const handleTaskCreated = (newTask) => {
-    // Assign new task to Default Project (id: 1)
-    const taskWithProject = { ...newTask, projectId: 1 };
-    setTasks(prevTasks => [taskWithProject, ...prevTasks]);
-    // Update project task count
-    setProjects(prevProjects => prevProjects.map(p => 
-      p.id === 1 ? { ...p, taskCount: p.taskCount + 1 } : p
-    ));
-    console.log('Task created successfully:', taskWithProject);
+  const handleTaskCreated = async (newTask) => {
+    try {
+      const response = await taskAPI.create(newTask);
+      setTasks(prevTasks => [response.data, ...prevTasks]);
+      // Refresh stats
+      const statsRes = await taskAPI.getStats();
+      setStats(statsRes.data);
+      console.log('Task created successfully:', response.data);
+    } catch (error) {
+      console.error('Error creating task:', error);
+    }
   };
 
   const handleEdit = (taskId) => {
     console.log('Edit task:', taskId);
   };
 
-  const handleDelete = (taskId) => {
-    console.log('Delete task:', taskId);
+  const handleDelete = async (taskId) => {
+    if (window.confirm('Are you sure you want to delete this task? This action cannot be undone.')) {
+      try {
+        await taskAPI.delete(taskId);
+        setTasks(prevTasks => prevTasks.filter(task => task.id !== taskId));
+        // Refresh stats
+        const statsRes = await taskAPI.getStats();
+        setStats(statsRes.data);
+        console.log('Task deleted successfully:', taskId);
+      } catch (error) {
+        console.error('Error deleting task:', error);
+      }
+    }
   };
 
   const filteredTasks = tasks.filter(task => {
@@ -109,6 +101,14 @@ const ManagerDashboard = () => {
     if (filters.search && !task.title.toLowerCase().includes(filters.search.toLowerCase())) return false;
     return true;
   });
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center h-96">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">
@@ -137,11 +137,12 @@ const ManagerDashboard = () => {
         </div>
       </div>
 
-      {/* Stats Row - 3 cards only, no Overdue */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-        <StatsCard title="Total Tasks" value={stats.total} icon="tasks" color="blue" change={12} />
-        <StatsCard title="Completed" value={stats.completed} icon="completed" color="green" change={8} />
-        <StatsCard title="Pending" value={stats.pending} icon="pending" color="yellow" change={-5} />
+      {/* Stats Row - 4 cards: Total, Completed, In Progress, Pending */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+        <StatsCard title="Total Tasks" value={stats.total} icon="tasks" color="blue" />
+        <StatsCard title="Completed" value={stats.completed} icon="completed" color="green" />
+        <StatsCard title="In Progress" value={stats.inProgress} icon="inprogress" color="orange" />
+        <StatsCard title="Pending" value={stats.pending} icon="pending" color="yellow" />
       </div>
 
       {/* Projects Section */}
@@ -250,7 +251,7 @@ const ManagerDashboard = () => {
               {filteredTasks.map((task) => (
                 <tr key={task.id} className="hover:bg-gray-50 transition-colors">
                   <td className="px-6 py-4 text-sm text-gray-900">{task.title}</td>
-                  <td className="px-6 py-4 text-sm text-gray-600">{task.assignedTo}</td>
+                  <td className="px-6 py-4 text-sm text-gray-600">{task.assignedToName || task.assignedTo}</td>
                   <td className="px-6 py-4">
                     <StatusBadge status={task.status} />
                   </td>

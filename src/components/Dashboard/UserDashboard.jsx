@@ -1,39 +1,33 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import StatusBadge from '../Common/StatusBadge';
 import PriorityBadge from '../Common/PriorityBadge';
+import { taskAPI } from '../../services/api';
 
 const UserDashboard = () => {
+  const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState('ALL');
   const [searchQuery, setSearchQuery] = useState('');
   const [sortBy, setSortBy] = useState('deadline');
+  const [myTasks, setMyTasks] = useState([]);
+  const [loading, setLoading] = useState(true);
 
-  // Sample tasks for user
-  const myTasks = [
-    {
-      id: 1,
-      title: 'Fix login authentication bug',
-      priority: 'HIGH',
-      deadline: '2024-05-12',
-      status: 'PENDING',
-      description: 'API not responding on login endpoint',
-    },
-    {
-      id: 2,
-      title: 'Implement email notification service',
-      priority: 'MEDIUM',
-      deadline: '2024-05-15',
-      status: 'IN_PROGRESS',
-      description: 'Set up Java Mail Sender integration',
-    },
-    {
-      id: 3,
-      title: 'Update API documentation',
-      priority: 'LOW',
-      deadline: '2024-05-20',
-      status: 'COMPLETED',
-      description: 'Document all REST endpoints',
-    },
-  ];
+  // Load tasks assigned to current user from data service
+  useEffect(() => {
+    fetchMyTasks();
+  }, []);
+
+  const fetchMyTasks = async () => {
+    setLoading(true);
+    try {
+      const response = await taskAPI.getMyTasks();
+      setMyTasks(response.data || []);
+    } catch (error) {
+      console.error('Error fetching my tasks:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const tabs = [
     { key: 'ALL', label: 'All' },
@@ -58,8 +52,16 @@ const UserDashboard = () => {
   });
 
   const handleViewTask = (taskId) => {
-    console.log('View task:', taskId);
+    navigate(`/user/task/${taskId}`);
   };
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center h-96">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">
@@ -124,46 +126,47 @@ const UserDashboard = () => {
       </div>
 
       {/* Tasks List */}
-      <div className="grid gap-4">
-        {sortedTasks.map((task) => (
-          <div
-            key={task.id}
-            className="bg-white rounded-xl shadow-sm border border-gray-200 p-6 hover:shadow-md transition-shadow cursor-pointer"
-            onClick={() => handleViewTask(task.id)}
-          >
-            <div className="flex items-start justify-between">
-              <div className="flex-1">
-                <div className="flex items-center space-x-3 mb-2">
-                  <h3 className="text-lg font-semibold text-gray-900">{task.title}</h3>
-                  <PriorityBadge priority={task.priority} />
-                  <StatusBadge status={task.status} />
-                </div>
-                <p className="text-gray-600 text-sm mb-3">{task.description}</p>
-                <div className="flex items-center space-x-4 text-sm">
-                  <div className="flex items-center text-gray-500">
-                    <svg className="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
-                    </svg>
-                    Due: {task.deadline}
-                  </div>
-                </div>
-              </div>
-              <div className="ml-4">
-                <svg className="w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 5l7 7-7 7" />
-                </svg>
-              </div>
-            </div>
-          </div>
-        ))}
-      </div>
-
-      {sortedTasks.length === 0 && (
+      {sortedTasks.length === 0 ? (
         <div className="text-center py-12">
           <svg className="w-16 h-16 text-gray-300 mx-auto mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
           </svg>
-          <p className="text-gray-500">No tasks found</p>
+          <p className="text-gray-500">No tasks assigned to you yet</p>
+          <p className="text-sm text-gray-400 mt-1">Tasks assigned by manager will appear here</p>
+        </div>
+      ) : (
+        <div className="grid gap-4">
+          {sortedTasks.map((task) => (
+            <div
+              key={task.id}
+              className="bg-white rounded-xl shadow-sm border border-gray-200 p-6 hover:shadow-md transition-shadow cursor-pointer"
+              onClick={() => handleViewTask(task.id)}
+            >
+              <div className="flex items-start justify-between">
+                <div className="flex-1">
+                  <div className="flex items-center space-x-3 mb-2">
+                    <h3 className="text-lg font-semibold text-gray-900">{task.title}</h3>
+                    <PriorityBadge priority={task.priority} />
+                    <StatusBadge status={task.status} />
+                  </div>
+                  <p className="text-gray-600 text-sm mb-3">{task.description}</p>
+                  <div className="flex items-center space-x-4 text-sm">
+                    <div className="flex items-center text-gray-500">
+                      <svg className="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                      </svg>
+                      Due: {task.deadline}
+                    </div>
+                  </div>
+                </div>
+                <div className="ml-4">
+                  <svg className="w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 5l7 7-7 7" />
+                  </svg>
+                </div>
+              </div>
+            </div>
+          ))}
         </div>
       )}
     </div>

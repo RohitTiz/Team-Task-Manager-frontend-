@@ -1,5 +1,6 @@
 // src/components/Tasks/CreateTaskModal.jsx
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
+import { userAPI } from '../../services/api';
 
 const CreateTaskModal = ({ isOpen, onClose, onTaskCreated }) => {
   const [formData, setFormData] = useState({
@@ -11,14 +12,29 @@ const CreateTaskModal = ({ isOpen, onClose, onTaskCreated }) => {
   });
   const [errors, setErrors] = useState({});
   const [loading, setLoading] = useState(false);
+  const [users, setUsers] = useState([]);
+  const [loadingUsers, setLoadingUsers] = useState(false);
 
-  // Sample users - replace with API call
-  const users = [
-    { id: 1, name: 'John Doe', email: 'john@taskflow.com' },
-    { id: 2, name: 'Jane Smith', email: 'jane@taskflow.com' },
-    { id: 3, name: 'Mike Johnson', email: 'mike@taskflow.com' },
-    { id: 4, name: 'Sarah Wilson', email: 'sarah@taskflow.com' },
-  ];
+  // Fetch real users from data service when modal opens
+  useEffect(() => {
+    if (isOpen) {
+      fetchUsers();
+    }
+  }, [isOpen]);
+
+  const fetchUsers = async () => {
+    setLoadingUsers(true);
+    try {
+      const response = await userAPI.getAll();
+      // Filter only ACTIVE users
+      const activeUsers = (response.data || []).filter(user => user.status === 'ACTIVE');
+      setUsers(activeUsers);
+    } catch (error) {
+      console.error('Error fetching users:', error);
+    } finally {
+      setLoadingUsers(false);
+    }
+  };
 
   const handleChange = (e) => {
     const { name, value } = e.target;
@@ -48,22 +64,18 @@ const CreateTaskModal = ({ isOpen, onClose, onTaskCreated }) => {
 
     setLoading(true);
     
+    // Simulate API delay
     setTimeout(() => {
       const selectedUser = users.find(u => u.id === parseInt(formData.assignedTo));
       const newTask = {
-        id: Date.now(),
         title: formData.title,
         description: formData.description,
-        assignedTo: selectedUser.name,
-        assignedToId: formData.assignedTo,
-        assignedToEmail: selectedUser.email,
-        status: 'PENDING',
+        assignedTo: parseInt(formData.assignedTo),
         priority: formData.priority,
         deadline: formData.deadline,
-        createdAt: new Date().toISOString(),
       };
       
-      console.log('Email would be sent to:', selectedUser.email);
+      console.log('Email would be sent to:', selectedUser?.email);
       console.log('New Task Created:', newTask);
       
       onTaskCreated(newTask);
@@ -159,21 +171,28 @@ const CreateTaskModal = ({ isOpen, onClose, onTaskCreated }) => {
                 <label className="block text-sm font-medium text-gray-700 mb-1">
                   Assign To <span className="text-red-500">*</span>
                 </label>
-                <select
-                  name="assignedTo"
-                  value={formData.assignedTo}
-                  onChange={handleChange}
-                  className={`w-full px-3 py-2 border rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition-all ${
-                    errors.assignedTo ? 'border-red-500' : 'border-gray-200'
-                  }`}
-                >
-                  <option value="">Select a team member</option>
-                  {users.map(user => (
-                    <option key={user.id} value={user.id}>
-                      {user.name} ({user.email})
-                    </option>
-                  ))}
-                </select>
+                {loadingUsers ? (
+                  <div className="flex items-center space-x-2 px-3 py-2 border border-gray-200 rounded-xl bg-gray-50">
+                    <div className="w-4 h-4 border-2 border-blue-500 border-t-transparent rounded-full animate-spin"></div>
+                    <span className="text-sm text-gray-500">Loading users...</span>
+                  </div>
+                ) : (
+                  <select
+                    name="assignedTo"
+                    value={formData.assignedTo}
+                    onChange={handleChange}
+                    className={`w-full px-3 py-2 border rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition-all ${
+                      errors.assignedTo ? 'border-red-500' : 'border-gray-200'
+                    }`}
+                  >
+                    <option value="">Select a team member</option>
+                    {users.map(user => (
+                      <option key={user.id} value={user.id}>
+                        {user.name} ({user.email})
+                      </option>
+                    ))}
+                  </select>
+                )}
                 {errors.assignedTo && <p className="mt-1 text-xs text-red-600">{errors.assignedTo}</p>}
                 
                 {selectedUser && (

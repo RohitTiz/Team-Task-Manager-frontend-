@@ -21,6 +21,13 @@ const StatsCard = ({ title, value, icon, color, change }) => {
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
           </svg>
         );
+      case 'inprogress':
+        return (
+          <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8v4l3 3" />
+          </svg>
+        );
       case 'overdue':
         return (
           <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -36,7 +43,16 @@ const StatsCard = ({ title, value, icon, color, change }) => {
     blue: 'bg-blue-500',
     green: 'bg-green-500',
     yellow: 'bg-yellow-500',
+    orange: 'bg-orange-500',
     red: 'bg-red-500',
+  };
+
+  const textColors = {
+    blue: 'text-blue-600',
+    green: 'text-green-600',
+    yellow: 'text-yellow-600',
+    orange: 'text-orange-600',
+    red: 'text-red-600',
   };
 
   return (
@@ -52,7 +68,7 @@ const StatsCard = ({ title, value, icon, color, change }) => {
           )}
         </div>
         <div className={`${colorClasses[color]} p-3 rounded-xl bg-opacity-10`}>
-          <div className={`text-${color}-600`}>{getIcon()}</div>
+          <div className={textColors[color]}>{getIcon()}</div>
         </div>
       </div>
     </div>

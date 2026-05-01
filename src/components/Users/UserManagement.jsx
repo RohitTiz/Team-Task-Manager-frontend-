@@ -1,73 +1,84 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import AddUserModal from './AddUserModal';
 import UserTable from './UserTable';
+import { userAPI } from '../../services/api';
 
 const UserManagement = () => {
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
-  const [users, setUsers] = useState([
-    {
-      id: 1,
-      name: 'John Doe',
-      email: 'john@taskflow.com',
-      role: 'USER',
-      status: 'ACTIVE',
-    },
-    {
-      id: 2,
-      name: 'Jane marry',
-      email: 'jane@taskflow.com',
-      role: 'USER',
-      status: 'ACTIVE',
-    },
-    {
-      id: 3,
-      name: 'Mike Johnson',
-      email: 'mike@taskflow.com',
-      role: 'MANAGER',
-      status: 'ACTIVE',
-    },
-    {
-      id: 4,
-      name: 'Sarah Wilson',
-      email: 'sarah@taskflow.com',
-      role: 'USER',
-      status: 'INACTIVE',
-    },
-  ]);
+  const [users, setUsers] = useState([]);
+  const [loading, setLoading] = useState(true);
 
-  const handleAddUser = (userData) => {
-    const newUser = {
-      id: users.length + 1,
-      ...userData,
-      status: 'ACTIVE',
-    };
-    setUsers([...users, newUser]);
+  // Load users from data service on component mount
+  useEffect(() => {
+    fetchUsers();
+  }, []);
+
+  const fetchUsers = async () => {
+    setLoading(true);
+    try {
+      const response = await userAPI.getAll();
+      setUsers(response.data);
+    } catch (error) {
+      console.error('Error fetching users:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleAddUser = async (userData) => {
+    try {
+      const response = await userAPI.create(userData);
+      setUsers(prevUsers => [...prevUsers, response.data]);
+      console.log('User added successfully:', response.data);
+    } catch (error) {
+      console.error('Error adding user:', error);
+    }
   };
 
   const handleEditUser = (userId) => {
     console.log('Edit user:', userId);
-    // Implement edit functionality
+    // Implement edit functionality if needed
   };
 
-  const handleDeleteUser = (userId) => {
+  const handleDeleteUser = async (userId) => {
     if (window.confirm('Are you sure you want to delete this user?')) {
-      setUsers(users.filter(user => user.id !== userId));
+      try {
+        await userAPI.delete(userId);
+        setUsers(prevUsers => prevUsers.filter(user => user.id !== userId));
+        console.log('User deleted successfully:', userId);
+      } catch (error) {
+        console.error('Error deleting user:', error);
+      }
     }
   };
 
-  const handleToggleStatus = (userId) => {
-    setUsers(users.map(user => 
-      user.id === userId 
-        ? { ...user, status: user.status === 'ACTIVE' ? 'INACTIVE' : 'ACTIVE' }
-        : user
-    ));
+  const handleToggleStatus = async (userId) => {
+    try {
+      await userAPI.toggleStatus(userId);
+      setUsers(prevUsers => prevUsers.map(user => 
+        user.id === userId 
+          ? { ...user, status: user.status === 'ACTIVE' ? 'INACTIVE' : 'ACTIVE' }
+          : user
+      ));
+      console.log('User status toggled:', userId);
+    } catch (error) {
+      console.error('Error toggling user status:', error);
+    }
   };
 
   const filteredUsers = users.filter(user =>
     user.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
     user.email.toLowerCase().includes(searchTerm.toLowerCase())
   );
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center h-96">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">
