@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react'
-import { taskAPI, userAPI } from '../../services/api'
+import taskAPI from '../../services/taskService'
+import userAPI from '../../services/userService'
 import TaskTable from './TaskTable'
 import SearchBar from '../Common/SearchBar'
 import FilterBar from '../Common/FilterBar'
@@ -16,9 +17,12 @@ const TasksList = () => {
 
   const fetchData = async () => {
     try {
-      const [tasksRes, usersRes] = await Promise.all([taskAPI.getAll(), userAPI.getAll()])
-      setTasks(tasksRes.data)
-      setUsers(usersRes.data)
+      const [tasksRes, usersRes] = await Promise.all([
+        taskAPI.getAll(),
+        userAPI.getAll()
+      ])
+      setTasks(tasksRes)
+      setUsers(usersRes)
     } catch (error) {
       console.error('Error fetching data:', error)
     } finally {
@@ -49,7 +53,7 @@ const TasksList = () => {
   return (
     <div className="space-y-6">
       <h1 className="text-2xl font-bold text-gray-900">All Tasks</h1>
-      
+
       <div className="bg-white rounded-xl shadow-sm border p-4 space-y-4">
         <SearchBar value={filters.search} onChange={(val) => handleFilterChange('search', val)} />
         <FilterBar filters={filters} onChange={handleFilterChange} />

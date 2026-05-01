@@ -1,17 +1,11 @@
-import { authAPI } from './api'
+import api from './api';
 
-export const login = async (email, password) => {
-  const response = await authAPI.login({ email, password })
-  return response.data
-}
+const userAPI = {
+  getAll: () => api.get('/users'),
+  getById: (id) => api.get(`/users/${id}`),
+  create: (data) => api.post('/users', data),
+  update: (id, data) => api.put(`/users/${id}`, data),
+  delete: (id) => api.delete(`/users/${id}`),
+};
 
-export const register = async (userData) => {
-  const response = await authAPI.register(userData)
-  return response.data
-}
-
-export const logout = async () => {
-  await authAPI.logout()
-  localStorage.removeItem('accessToken')
-  localStorage.removeItem('user')
-}
+export default userAPI;
