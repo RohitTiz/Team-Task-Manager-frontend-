@@ -1,8 +1,11 @@
 // src/components/Tasks/CreateTaskModal.jsx
 import React, { useState, useEffect } from 'react';
 import { userAPI } from '../../services/api';
+import { notifyTaskAssigned } from '../../services/notificationService';
+import { useAuthContext } from '../../context/AuthContext';
 
 const CreateTaskModal = ({ isOpen, onClose, onTaskCreated }) => {
+  const { user } = useAuthContext();
   const [formData, setFormData] = useState({
     title: '',
     description: '',
@@ -68,15 +71,22 @@ const CreateTaskModal = ({ isOpen, onClose, onTaskCreated }) => {
     setTimeout(() => {
       const selectedUser = users.find(u => u.id === parseInt(formData.assignedTo));
       const newTask = {
+        id: Date.now(), // Generate a temporary ID
         title: formData.title,
         description: formData.description,
         assignedTo: parseInt(formData.assignedTo),
+        assignedToName: selectedUser?.name,
         priority: formData.priority,
         deadline: formData.deadline,
+        status: 'PENDING',
+        createdAt: new Date().toISOString(),
       };
       
       console.log('Email would be sent to:', selectedUser?.email);
       console.log('New Task Created:', newTask);
+      
+      // Send notification to assigned user
+      notifyTaskAssigned(newTask, parseInt(formData.assignedTo), user?.name || 'Manager');
       
       onTaskCreated(newTask);
       onClose();

@@ -6,7 +6,6 @@ import CreateTaskModal from '../Tasks/CreateTaskModal';
 import CreateProjectModal from '../Projects/CreateProjectModal';
 import ProjectCard from '../Projects/ProjectCard';
 import { taskAPI, projectAPI } from '../../services/api';
-import { TASK_STATUS } from '../../utils/constants';
 
 const ManagerDashboard = () => {
   const [filters, setFilters] = useState({

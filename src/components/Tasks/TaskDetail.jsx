@@ -5,10 +5,13 @@ import StatusBadge from '../Common/StatusBadge';
 import PriorityBadge from '../Common/PriorityBadge';
 import { taskAPI, userAPI } from '../../services/api';
 import { TASK_STATUS } from '../../utils/constants';
+import { notifyTaskStatusChanged, notifyCommentAdded, notifyManagerTaskStatusChanged } from '../../services/notificationService';
+import { useAuthContext } from '../../context/AuthContext';
 
 const TaskDetail = () => {
   const { id } = useParams();
   const navigate = useNavigate();
+  const { user } = useAuthContext();
   const [task, setTask] = useState(null);
   const [loading, setLoading] = useState(true);
   const [selectedStatus, setSelectedStatus] = useState('');
@@ -17,11 +20,13 @@ const TaskDetail = () => {
   const [comments, setComments] = useState([]);
   const [activities, setActivities] = useState([]);
   const [users, setUsers] = useState([]);
+  const [allUsers, setAllUsers] = useState([]);
 
   // Load task data from data service
   useEffect(() => {
     fetchTaskData();
     fetchUsers();
+    fetchAllUsers();
   }, [id]);
 
   const fetchTaskData = async () => {
@@ -47,6 +52,15 @@ const TaskDetail = () => {
       setUsers(response.data || []);
     } catch (error) {
       console.error('Error fetching users:', error);
+    }
+  };
+
+  const fetchAllUsers = async () => {
+    try {
+      const response = await userAPI.getAll();
+      setAllUsers(response.data || []);
+    } catch (error) {
+      console.error('Error fetching all users:', error);
     }
   };
 
@@ -89,13 +103,16 @@ const TaskDetail = () => {
     if (selectedStatus === task.status) return;
     
     setUpdating(true);
+    const oldStatus = task.status;
+    const newStatus = selectedStatus;
+    
     try {
       await taskAPI.updateStatus(task.id, selectedStatus);
       
       // Add activity log
       const newActivity = {
         id: activities.length + 1,
-        action: `Status updated from ${task.status} to ${selectedStatus}`,
+        action: `Status updated from ${oldStatus} to ${newStatus}`,
         timestamp: new Date().toLocaleString(),
       };
       const updatedActivities = [...activities, newActivity];
@@ -104,6 +121,15 @@ const TaskDetail = () => {
       
       // Update local task
       setTask({ ...task, status: selectedStatus });
+      
+      // Send notifications
+      const managers = allUsers.filter(u => u.role === 'MANAGER' && u.status === 'ACTIVE');
+      
+      // Notify task assignee (if not the one who changed it)
+      notifyTaskStatusChanged(task, newStatus, oldStatus, user?.id, user?.name);
+      
+      // Notify all managers
+      notifyManagerTaskStatusChanged(task, newStatus, oldStatus, user?.name, managers);
       
       console.log('Status updated successfully');
     } catch (error) {
@@ -116,13 +142,9 @@ const TaskDetail = () => {
   const handleAddComment = async () => {
     if (!newComment.trim()) return;
     
-    // Get current user
-    const userStr = localStorage.getItem('taskflow_user');
-    const currentUser = userStr ? JSON.parse(userStr) : { name: 'User' };
-    
     const comment = {
       id: comments.length + 1,
-      user: currentUser.name,
+      user: user?.name || 'User',
       text: newComment,
       timestamp: new Date().toLocaleString(),
     };
@@ -135,17 +157,22 @@ const TaskDetail = () => {
     // Add activity log
     const newActivity = {
       id: activities.length + 1,
-      action: `Comment added by ${currentUser.name}`,
+      action: `Comment added by ${user?.name || 'User'}`,
       timestamp: new Date().toLocaleString(),
     };
     const updatedActivities = [...activities, newActivity];
     setActivities(updatedActivities);
     saveActivities(task.id, updatedActivities);
+    
+    // Send notification to task assignee (if not the commenter)
+    if (task.assignedTo !== user?.id) {
+      notifyCommentAdded(task, newComment, user?.id, user?.name, task.assignedTo);
+    }
   };
 
   const getUserName = (userId) => {
-    const user = users.find(u => u.id === userId);
-    return user?.name || 'Unassigned';
+    const userFound = users.find(u => u.id === userId);
+    return userFound?.name || 'Unassigned';
   };
 
   const statusOptions = [

@@ -5,10 +5,13 @@ import StatusBadge from '../Common/StatusBadge';
 import PriorityBadge from '../Common/PriorityBadge';
 import AddMemberModal from './AddMemberModal';
 import { projectAPI, taskAPI, userAPI } from '../../services/api';
+import { notifyProjectMemberAdded } from '../../services/notificationService';
+import { useAuthContext } from '../../context/AuthContext';
 
 const ProjectDetails = () => {
   const { id } = useParams();
   const navigate = useNavigate();
+  const { user } = useAuthContext();
   const [project, setProject] = useState(null);
   const [tasks, setTasks] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -48,8 +51,8 @@ const ProjectDetails = () => {
 
   const fetchAllUsers = async () => {
     try {
-      const usersRes = await userAPI.getAll();
-      setAllUsers(usersRes.data || []);
+      const response = await userAPI.getAll();
+      setAllUsers(response.data || []);
     } catch (error) {
       console.error('Error fetching users:', error);
     }
@@ -58,10 +61,12 @@ const ProjectDetails = () => {
   const handleAddMember = async (member) => {
     try {
       await projectAPI.addMember(parseInt(id), member.id);
-      // Refresh project data
       await fetchProjectData();
+      
+      // Send notification to added member
+      notifyProjectMemberAdded(project, member.id, user?.name || 'Manager');
+      
       console.log('Member added:', member);
-      console.log('Email sent to:', member.email);
     } catch (error) {
       console.error('Error adding member:', error);
     }
@@ -111,10 +116,9 @@ const ProjectDetails = () => {
     }
   };
 
-  // Helper to get user name by ID
   const getUserName = (userId) => {
-    const user = allUsers.find(u => u.id === userId);
-    return user?.name || 'Unknown';
+    const userFound = allUsers.find(u => u.id === userId);
+    return userFound?.name || 'Unknown';
   };
 
   if (loading) {
