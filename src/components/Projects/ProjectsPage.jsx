@@ -1,61 +1,50 @@
 // src/components/Projects/ProjectsPage.jsx
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import ProjectCard from './ProjectCard';
 import CreateProjectModal from './CreateProjectModal';
+import { projectAPI } from '../../services/api';
 
 const ProjectsPage = () => {
   const navigate = useNavigate();
   const [isModalOpen, setIsModalOpen] = useState(false);
-  const [projects, setProjects] = useState([
-    {
-      id: 1,
-      name: 'Default Project',
-      description: 'Default project containing all existing tasks',
-      status: 'ACTIVE',
-      createdAt: '2024-01-01',
-      members: [
-        { id: 1, name: 'John Manager', email: 'manager@taskflow.com', role: 'MANAGER' },
-        { id: 2, name: 'Jane User', email: 'user@taskflow.com', role: 'USER' },
-      ],
-      taskCount: 4,
-    },
-    {
-      id: 2,
-      name: 'E-Commerce Platform',
-      description: 'Building a modern e-commerce platform with React and Spring Boot',
-      status: 'ACTIVE',
-      createdAt: '2024-02-15',
-      members: [
-        { id: 1, name: 'John Manager', email: 'manager@taskflow.com', role: 'MANAGER' },
-        { id: 2, name: 'Jane User', email: 'user@taskflow.com', role: 'USER' },
-        { id: 3, name: 'Mike Johnson', email: 'mike@taskflow.com', role: 'USER' },
-      ],
-      taskCount: 8,
-    },
-    {
-      id: 3,
-      name: 'Mobile App Development',
-      description: 'Cross-platform mobile app for task management',
-      status: 'ACTIVE',
-      createdAt: '2024-03-01',
-      members: [
-        { id: 1, name: 'John Manager', email: 'manager@taskflow.com', role: 'MANAGER' },
-        { id: 4, name: 'Sarah Wilson', email: 'sarah@taskflow.com', role: 'USER' },
-      ],
-      taskCount: 3,
-    },
-  ]);
-
+  const [projects, setProjects] = useState([]);
+  const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState('ALL'); // ALL, ACTIVE, COMPLETED, ON_HOLD
 
-  const handleProjectCreated = (newProject) => {
-    setProjects(prev => [newProject, ...prev]);
+  // Load real projects from data service
+  useEffect(() => {
+    fetchProjects();
+  }, []);
+
+  const fetchProjects = async () => {
+    setLoading(true);
+    try {
+      const response = await projectAPI.getAll();
+      setProjects(response.data || []);
+    } catch (error) {
+      console.error('Error fetching projects:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleProjectCreated = async (newProject) => {
+    try {
+      const response = await projectAPI.create(newProject);
+      setProjects(prev => [response.data, ...prev]);
+      console.log('Project created:', response.data);
+    } catch (error) {
+      console.error('Error creating project:', error);
+    }
   };
 
   const filteredProjects = projects.filter(project => {
     if (filter === 'ALL') return true;
-    return project.status === filter;
+    if (filter === 'ACTIVE') return project.status === 'ACTIVE';
+    if (filter === 'COMPLETED') return project.status === 'COMPLETED';
+    if (filter === 'ON_HOLD') return project.status === 'ON_HOLD';
+    return true;
   });
 
   const stats = {
@@ -64,6 +53,14 @@ const ProjectsPage = () => {
     completed: projects.filter(p => p.status === 'COMPLETED').length,
     onHold: projects.filter(p => p.status === 'ON_HOLD').length,
   };
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center h-96">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">
