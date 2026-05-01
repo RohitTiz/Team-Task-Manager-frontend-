@@ -72,11 +72,11 @@ const ManagerDashboard = () => {
     },
   ]);
 
+  // Stats without overdue
   const stats = {
     total: tasks.length,
     completed: tasks.filter(t => t.status === 'COMPLETED').length,
     pending: tasks.filter(t => t.status === 'PENDING').length,
-    overdue: tasks.filter(t => new Date(t.deadline) < new Date() && t.status !== 'COMPLETED').length,
   };
 
   const handleProjectCreated = (newProject) => {
@@ -134,24 +134,17 @@ const ManagerDashboard = () => {
             </svg>
             <span>Create Task</span>
           </button>
-          <button className="px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors flex items-center space-x-2">
-            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M18 9v3m0 0v3m0-3h3m-3 0h-3m-2-5a4 4 0 11-8 0 4 4 0 018 0zM3 20a6 6 0 0112 0v1H3v-1z" />
-            </svg>
-            <span>Add User</span>
-          </button>
         </div>
       </div>
 
-      {/* Stats Row */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+      {/* Stats Row - 3 cards only, no Overdue */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
         <StatsCard title="Total Tasks" value={stats.total} icon="tasks" color="blue" change={12} />
         <StatsCard title="Completed" value={stats.completed} icon="completed" color="green" change={8} />
         <StatsCard title="Pending" value={stats.pending} icon="pending" color="yellow" change={-5} />
-        <StatsCard title="Overdue" value={stats.overdue} icon="overdue" color="red" change={3} />
       </div>
 
-      {/* Projects Section - NEW */}
+      {/* Projects Section */}
       <div>
         <div className="flex justify-between items-center mb-4">
           <div>
