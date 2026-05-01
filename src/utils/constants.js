@@ -27,6 +27,18 @@ export const TASK_PRIORITY_OPTIONS = [
   { value: TASK_PRIORITY.HIGH, label: 'High', color: 'bg-red-100 text-red-800' },
 ];
 
+export const PROJECT_STATUS = {
+  ACTIVE: 'ACTIVE',
+  COMPLETED: 'COMPLETED',
+  ON_HOLD: 'ON_HOLD',
+};
+
+export const PROJECT_STATUS_OPTIONS = [
+  { value: PROJECT_STATUS.ACTIVE, label: 'Active', color: 'bg-green-100 text-green-800' },
+  { value: PROJECT_STATUS.COMPLETED, label: 'Completed', color: 'bg-blue-100 text-blue-800' },
+  { value: PROJECT_STATUS.ON_HOLD, label: 'On Hold', color: 'bg-yellow-100 text-yellow-800' },
+];
+
 export const API_ENDPOINTS = {
   AUTH: {
     LOGIN: '/auth/login',
@@ -61,8 +73,8 @@ export const STORAGE_KEYS = {
 export const SIDEBAR_MENU = {
   MANAGER: [
     { path: '/manager/dashboard', label: 'Dashboard', icon: 'LayoutDashboard' },
+    { path: '/manager/projects', label: 'Projects', icon: 'FolderKanban' },
     { path: '/manager/users', label: 'Users', icon: 'Users' },
-    { path: '/manager/tasks', label: 'Tasks', icon: 'CheckSquare' },
   ],
   USER: [
     { path: '/user/dashboard', label: 'My Tasks', icon: 'ClipboardList' },

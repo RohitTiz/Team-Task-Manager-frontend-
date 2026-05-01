@@ -15,6 +15,8 @@ const UserDashboard = lazy(() => import('./components/Dashboard/UserDashboard'))
 const UserManagement = lazy(() => import('./components/Users/UserManagement'));
 const TasksList = lazy(() => import('./components/Tasks/TasksList'));
 const TaskDetail = lazy(() => import('./components/Tasks/TaskDetail'));
+const ProjectDetails = lazy(() => import('./components/Projects/ProjectDetails'));
+const ProjectsPage = lazy(() => import('./components/Projects/ProjectsPage'));
 
 // Loading fallback component with skeleton UI
 const LoadingFallback = () => (
@@ -72,9 +74,10 @@ function App() {
             >
               <Route index element={<Navigate to="dashboard" replace />} />
               <Route path="dashboard" element={<ManagerDashboard />} />
+              <Route path="projects" element={<ProjectsPage />} />
               <Route path="users" element={<UserManagement />} />
+              <Route path="project/:id" element={<ProjectDetails />} />
               <Route path="tasks" element={<TasksList />} />
-              
               <Route path="task/:id" element={<TaskDetail />} />
             </Route>
             

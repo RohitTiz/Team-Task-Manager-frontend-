@@ -93,4 +93,34 @@ const api = {
   delete: (url) => request(url, { method: 'DELETE' }),
 };
 
+// Project APIs
+export const projectAPI = {
+  getAll: () => request('/projects', { method: 'GET' }),
+  getById: (id) => request(`/projects/${id}`, { method: 'GET' }),
+  create: (data) => request('/projects', { method: 'POST', body: JSON.stringify(data) }),
+  update: (id, data) => request(`/projects/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
+  delete: (id) => request(`/projects/${id}`, { method: 'DELETE' }),
+  addMember: (projectId, userId) => request(`/projects/${projectId}/members`, { method: 'POST', body: JSON.stringify({ userId }) }),
+  removeMember: (projectId, userId) => request(`/projects/${projectId}/members/${userId}`, { method: 'DELETE' }),
+  getMembers: (projectId) => request(`/projects/${projectId}/members`, { method: 'GET' }),
+  getTasks: (projectId) => request(`/projects/${projectId}/tasks`, { method: 'GET' }),
+  addTask: (projectId, taskData) => request(`/projects/${projectId}/tasks`, { method: 'POST', body: JSON.stringify(taskData) }),
+};
+
+// Mock data for projects (for testing without backend)
+export const mockProjects = [
+  {
+    id: 1,
+    name: 'Default Project',
+    description: 'Default project containing all existing tasks',
+    status: 'ACTIVE',
+    createdAt: '2024-01-01',
+    members: [
+      { id: 1, name: 'John Manager', email: 'manager@taskflow.com', role: 'MANAGER' },
+      { id: 2, name: 'Jane User', email: 'user@taskflow.com', role: 'USER' },
+    ],
+    taskCount: 4,
+  },
+];
+
 export default api;
